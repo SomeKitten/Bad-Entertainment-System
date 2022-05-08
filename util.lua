@@ -5,7 +5,7 @@ util.hex2 = "%02X"
 util.hex4 = "%04X"
 util.oct3 = "%03o"
 
-util.file_to_bytes = function(file, byte_array, file_start, arr_start)
+util.file_to_bytes = function(file, byte_array, file_start, arr_start, len)
     local byte = file:read(1)
     local i = -file_start
     while byte do
@@ -13,6 +13,8 @@ util.file_to_bytes = function(file, byte_array, file_start, arr_start)
 
         byte = file:read(1)
         i = i + 1
+
+        if len ~= 0 and i >= len then break end
     end
 end
 

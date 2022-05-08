@@ -13,6 +13,7 @@ ppu.tick = function(mem, cycles)
         if ppu.scanline == 241 then
             print("NMI SET")
             CPU_MEM.PPU_STATUS = bit.bor(CPU_MEM.PPU_STATUS, 0x80)
+            NMI = true
         end
 
         if ppu.scanline >= 262 then

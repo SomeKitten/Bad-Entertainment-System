@@ -33,7 +33,7 @@ function cpu.tick(mem, regs)
             print("Ran " .. cpu.instructions_ran .. " instructions")
         end
 
-        if cpu.cycles_ran > 148911 then
+        if cpu.cycles_ran > 29780 * 10 then
             QUIT = true
             -- love.event.quit()
         end
@@ -44,6 +44,8 @@ function cpu.tick(mem, regs)
         print("AT: " .. util.hex4:format(regs.PC))
         QUIT = true
         -- love.event.quit()
+
+        return 0
     end
 end
 

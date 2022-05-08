@@ -34,9 +34,11 @@ function memory.read_cpu(mem, addr)
         elseif addr == 0x2001 then
             return mem.PPU_MASK
         elseif addr == 0x2002 then
+            print("READING PPU_STATUS")
+
             local val = mem.PPU_STATUS
 
-            mem.PPU_LATCH = 0
+            mem.PPU_LATCH = 1
             mem.PPU_STATUS = bit.band(mem.PPU_STATUS, 0x7F)
 
             return val
@@ -49,6 +51,8 @@ function memory.read_cpu(mem, addr)
         elseif addr == 0x2006 then
             return mem.PPU_ADDR
         elseif addr == 0x2007 then
+            print("READING PPU_ADDR: " .. util.hex4:format(mem.PPU_ADDR))
+
             local val = memory.read_ppu(PPU_MEM, bit.band(mem.PPU_ADDR, 0x3FFF))
 
             if bit.band(mem.PPU_CTRL, 0x04) == 0 then
@@ -59,7 +63,7 @@ function memory.read_cpu(mem, addr)
 
             return val
         else
-            return mem.PPU[addr - 0x2000]
+            print("PPU ADDRESS NOT SUPPORTED: " .. util.hex4:format(addr))
         end
     elseif addr < 0x4020 then
         return mem.IO[addr - 0x4000]
@@ -90,14 +94,19 @@ function memory.write_cpu(mem, addr, val)
         elseif addr == 0x2005 then
             mem.PPU_SCROLL = val
         elseif addr == 0x2006 then
-            if mem.PPU_LATCH == 0 then
-                mem.PPU_LATCH = 1
-                mem.PPU_ADDR = bit.band(mem.PPU_ADDR, 0xFF00) + val
-            else
+            print("WRITING TO PPU_ADDR: " .. util.hex2:format(val))
+
+            if mem.PPU_LATCH == 1 then
                 mem.PPU_LATCH = 0
-                mem.PPU_ADDR = bit.band(mem.PPU_ADDR, 0xFF) + val * 0x100
+                mem._PPU_ADDR = bit.band(val, 0x3F)
+            else
+                mem.PPU_LATCH = 1
+                mem.PPU_ADDR = mem._PPU_ADDR * 0x100 + val
             end
+
+            print("PPU_ADDR: " .. util.hex4:format(mem.PPU_ADDR))
         elseif addr == 0x2007 then
+            print("PPU write to: " .. util.hex4:format(mem.PPU_ADDR))
             memory.write_ppu(PPU_MEM, bit.band(mem.PPU_ADDR, 0x3FFF), val)
 
             if bit.band(mem.PPU_CTRL, 0x04) == 0 then

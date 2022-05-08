@@ -1,5 +1,6 @@
+local instructions = require "instructions"
 ROMS_DIR = "/home/kitten/プロジェクト/Roms/NES/"
-ROM = "donkeykong.nes"
+ROM = "nestest.nes"
 
 local util = require("./util")
 local memory = require("./memory")
@@ -7,7 +8,7 @@ local cpu = require("./cpu")
 local ppu = require("./ppu")
 
 function love.load()
-    love.window.setMode(341 * 3, 240 * 3, {})
+    love.window.setMode(256 * 3, 240 * 3, {})
     love.graphics.setDefaultFilter('nearest', 'nearest')
 
     -- NES REGISTERS
@@ -35,21 +36,26 @@ function love.load()
     f:close()
 
     util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"), CPU_MEM.CART, 0x0010,
-                       0x8000 - 0x4020)
+                       0x8000 - 0x4020, 0x4000)
     util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"), CPU_MEM.CART, 0x0010,
-                       0xC000 - 0x4020)
+                       0xC000 - 0x4020, 0x4000)
 
-    local copy_start = 0xC000 - 0x4020
-    for i = copy_start, copy_start + 0x0FFF do
-        PPU_MEM.PATTERNTABLE_0[i - copy_start] = CPU_MEM.CART[i]
-    end
+    util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"), PPU_MEM.PATTERNTABLE_0,
+                       0x0010 + 0x4000, 0, 0x2000)
 
-    for i = copy_start + 0x1000, copy_start + 0x1FFF do
-        PPU_MEM.PATTERNTABLE_1[i - (copy_start + 0x1000)] = CPU_MEM.CART[i]
-    end
+    -- local copy_start = 0xC000 - 0x4020
+    -- for i = copy_start, copy_start + 0x0FFF do
+    --     PPU_MEM.PATTERNTABLE_0[i - copy_start] = CPU_MEM.CART[i]
+    -- end
+
+    -- for i = copy_start + 0x1000, copy_start + 0x1FFF do
+    --     PPU_MEM.PATTERNTABLE_1[i - (copy_start + 0x1000)] = CPU_MEM.CART[i]
+    -- end
 
     REGISTERS.PC = memory.read_cpu(CPU_MEM, 0xFFFD) * 0x100 +
                        memory.read_cpu(CPU_MEM, 0xFFFC)
+
+    NMI = false
 
     print("RESET VEC:" .. util.hex4:format(REGISTERS.PC))
 
@@ -62,46 +68,69 @@ function love.update(dt)
         if QUIT then return end
         local cycles = cpu.tick(CPU_MEM, REGISTERS)
         ppu.tick(PPU_MEM, cycles)
+
+        if NMI and REGISTERS.P >= 0x80 then
+            print("NMI")
+            NMI = false
+
+            -- push hi
+            instructions.push(CPU_MEM, REGISTERS,
+                              math.floor(REGISTERS.PC / 0x100))
+            -- push lo
+            instructions.push(CPU_MEM, REGISTERS, REGISTERS.PC % 0x100)
+
+            local val = REGISTERS.P
+            val = util.set_bit(val, 1, 5)
+            val = util.set_bit(val, 1, 4)
+
+            instructions.push(CPU_MEM, REGISTERS, val)
+
+            REGISTERS.PC = memory.read_cpu(CPU_MEM, 0xFFFA) +
+                               memory.read_cpu(CPU_MEM, 0xFFFB) * 0x100
+
+            print("NMI VEC: " .. util.hex4:format(REGISTERS.PC))
+        end
+    end
+end
+
+function draw_tile(colours, tile_index, tile_x, tile_y)
+    for y = 0, 7 do
+        local low = PPU_MEM.PATTERNTABLE_0[tile_index * 0x10 + y]
+        local high = PPU_MEM.PATTERNTABLE_0[tile_index * 0x10 + y + 8]
+
+        for x = 0, 7 do
+            -- local pix = util.get_bit(low, x)
+            local pix = 0
+            pix = pix + util.get_bit(high, 7 - x) * 2
+
+            table.insert(colours[pix], {x + tile_x * 10, y + tile_y * 10})
+        end
     end
 end
 
 function love.draw()
     if QUIT then
         local colours = {}
-        colours[0] = {}
-        colours[1] = {}
-        colours[2] = {}
-        colours[3] = {}
+        for i = 0, 3 do colours[i] = {} end
 
-        local width = 8
+        for x = 0, 0x1F do
+            for y = 0, 0x1F do
+                local tile = PPU_MEM.NAMETABLE_0[x + y * 0x20]
 
-        for t = 0, 511 do
-            local tx = (t % width)
-            local ty = math.floor(t / width)
-            local i = t * 16
-
-            for y1 = 0, 7 do
-                local upper = memory.read_ppu(PPU_MEM, i + y1)
-                local lower = memory.read_ppu(PPU_MEM, i + y1 + 8)
-
-                for x1 = 0, 7 do
-                    local pixel = 2 * util.get_bit(upper, x1)
-                    pixel = pixel + util.get_bit(lower, x1)
-
-                    table.insert(colours[pixel], {tx * 8 + x1, ty * 8 + y1})
-                end
+                draw_tile(colours, tile, x, y)
             end
         end
 
-        -- print(DUMP(colours))
-
-        local canv = love.graphics.newCanvas(341, 240)
+        local canv = love.graphics.newCanvas(256, 240)
         love.graphics.setCanvas(canv)
-        for i = 0, 3 do
-            love.graphics.setColor(1 / 3 * i, 1 / 3 * i, 1 / 3 * i)
-            love.graphics.points(colours[i])
+        for i, v in pairs(colours) do
+            love.graphics.setColor(i / 3, i / 3, i / 3)
+            love.graphics.points(v)
         end
+
+        local scale = 3
+
         love.graphics.setCanvas()
-        love.graphics.draw(canv, 0, 0, 0, 16, 16)
+        love.graphics.draw(canv, 0, 0, 0, scale, scale)
     end
 end
