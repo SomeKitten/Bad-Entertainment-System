@@ -31,6 +31,8 @@ ppu.tick = function(mem, cycles)
             CPU_MEM.PPU_STATUS = bit.band(CPU_MEM.PPU_STATUS, 0x7F)
 
             NMI_OCCURRED = 0
+
+            return true
         end
     end
 
@@ -57,6 +59,8 @@ ppu.tick = function(mem, cycles)
 
         -- print("NMI VEC: " .. util.hex4:format(REGISTERS.PC))
     end
+
+    return false
 end
 
 return ppu

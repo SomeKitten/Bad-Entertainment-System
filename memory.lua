@@ -68,7 +68,17 @@ function memory.read_cpu(mem, addr)
             print("PPU ADDRESS NOT SUPPORTED: " .. util.hex4:format(addr))
         end
     elseif addr < 0x4020 then
-        return mem.IO[addr - 0x4000]
+        if addr == 0x4016 then
+            -- print("CONTROLLER READ")
+
+            local val = CONTROLLER[CONTROLLER_SHIFT]
+            CONTROLLER_SHIFT = CONTROLLER_SHIFT + 1
+
+            if not val then return 1 end
+            return val
+        else
+            return mem.IO[addr - 0x4000]
+        end
     elseif addr < 0xFFFF then
         return mem.CART[addr - 0x4020]
     else
@@ -146,7 +156,16 @@ function memory.write_cpu(mem, addr, val)
                                  bit.band(val, 0x1F)
         end
     elseif addr < 0x4020 then
-        mem.IO[addr - 0x4000] = val
+        if addr == 0x4014 then
+            print("OAM DMA: " .. util.hex2:format(val))
+            for i = 0, 255 do
+                PPU_MEM.OAM[i] = memory.read_cpu(mem, val * 0x100 + i)
+            end
+        elseif addr == 0x4016 then
+            CONTROLLER_POLL = val % 2
+        else
+            mem.IO[addr - 0x4000] = val
+        end
     elseif addr < 0xFFFF then
         mem.CART[addr - 0x4020] = val
     else

@@ -21,27 +21,27 @@ function cpu.tick(mem, regs)
 
         if not cycles then
             print("MISSING CYCLES: " .. util.hex2:format(inst))
-            RENDER = true
+            QUIT = true
         end
 
         cpu.instructions_ran = cpu.instructions_ran + 1
         cpu.cycles_ran = cpu.cycles_ran + 1
 
-        if cpu.cycles_ran % 10000 == 0 then
-            -- print("Ran " .. cpu.instructions_ran .. " instructions")
-        end
+        -- if cpu.cycles_ran % 10000 == 0 then
+        --     -- print("Ran " .. cpu.instructions_ran .. " instructions")
+        -- end
 
-        if cpu.cycles_ran > 100000 then
-            RENDER = true
-            -- love.event.quit()
-        end
+        -- if cpu.cycles_ran > 100000 then
+        --     QUIT = true
+        --     -- love.event.quit()
+        -- end
 
         return cycles
     else
         print(inst)
         print("Unknown instruction: " .. util.hex2:format(inst))
         print("AT: " .. util.hex4:format(regs.PC))
-        RENDER = true
+        QUIT = true
         -- love.event.quit()
 
         return 0

@@ -108,6 +108,9 @@ instructions[0xB0] = function(mem, regs)
     -- BCS
     local val = memory.read_cpu(mem, regs.PC)
     regs.PC = instructions.inc16(regs.PC)
+
+    if val > 0x7F then val = val - 0x100 end
+
     if util.get_bit(regs.P, 0) == 1 then regs.PC = regs.PC + val end
 
     -- **
@@ -125,6 +128,9 @@ instructions[0x90] = function(mem, regs)
     -- BCC
     local val = memory.read_cpu(mem, regs.PC)
     regs.PC = instructions.inc16(regs.PC)
+
+    if val > 0x7F then val = val - 0x100 end
+
     if util.get_bit(regs.P, 0) == 0 then regs.PC = regs.PC + val end
 
     -- **
@@ -375,6 +381,8 @@ instructions[0x30] = function(mem, regs)
     -- BMI
     local val = memory.read_cpu(mem, regs.PC)
     regs.PC = instructions.inc16(regs.PC)
+
+    if val > 0x7F then val = val - 0x100 end
 
     if util.get_bit(regs.P, 7) == 1 then regs.PC = regs.PC + val end
 
@@ -2604,6 +2612,9 @@ instructions[0x7D] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = val2 % 256
+
+    -- *
+    return 4
 end
 
 instructions[0xDD] = function(mem, regs)
@@ -3496,6 +3507,8 @@ instructions[0xFF] = function(mem, regs)
     -- SBC
     regs.PC = pc
     instructions[0xFD](mem, regs)
+
+    return 7
 end
 
 instructions[0x03] = function(mem, regs)
@@ -3670,6 +3683,8 @@ instructions[0x23] = function(mem, regs)
     -- AND
     regs.PC = pc
     instructions[0x21](mem, regs)
+
+    return 8
 end
 
 instructions[0x27] = function(mem, regs)

@@ -1,4 +1,3 @@
-local instructions = require "instructions"
 ROMS_DIR = "/home/kitten/プロジェクト/Roms/NES/"
 ROM = "donkeykong.nes"
 
@@ -6,6 +5,7 @@ local util = require("./util")
 local memory = require("./memory")
 local cpu = require("./cpu")
 local ppu = require("./ppu")
+local controller = require("./controller")
 
 function love.load()
     love.window.setMode(256 * 3, 240 * 3, {})
@@ -45,36 +45,48 @@ function love.load()
                        memory.read_cpu(CPU_MEM, 0xFFFC)
 
     -- DEBUG
-    REGISTERS.A = 0x3C
-    REGISTERS.X = 0xFF
-    REGISTERS.Y = 0xAA
+    REGISTERS.A = 0x00
+    REGISTERS.X = 0x17
+    REGISTERS.Y = 0x00
+    REGISTERS.P = 0x06
     REGISTERS.SP = 0xFA
-    REGISTERS.P = 0x04
     CPU_MEM.PPU_STATUS = 0x10
 
     NMI_OCCURRED = 0
 
     -- print("RESET VEC:" .. util.hex4:format(REGISTERS.PC))
 
-    RENDER = false
+    RENDER = true
+    QUIT = false
+    DEBUG_OUTPUT = false
+
+    CPU_CYCLES = 0
 end
 
 function love.update(dt)
     --    TODO Assumes that each instruction is 3 cycles
-    for i = 0, 29780 / 3 do
-        if RENDER then return end
+    for i = 1, 100000 do
+        if QUIT then return end
 
-        io.write("PC:" .. util.hex4:format(REGISTERS.PC) .. " A:" ..
-                     util.hex2:format(REGISTERS.A) .. " X:" ..
-                     util.hex2:format(REGISTERS.X) .. " Y:" ..
-                     util.hex2:format(REGISTERS.Y) .. " P:" ..
-                     util.hex2:format(REGISTERS.P) .. " SP:" ..
-                     util.hex2:format(REGISTERS.SP))
+        if DEBUG_OUTPUT then
+            io.write("PC:" .. util.hex4:format(REGISTERS.PC) .. " A:" ..
+                         util.hex2:format(REGISTERS.A) .. " X:" ..
+                         util.hex2:format(REGISTERS.X) .. " Y:" ..
+                         util.hex2:format(REGISTERS.Y) .. " P:" ..
+                         util.hex2:format(REGISTERS.P) .. " SP:" ..
+                         util.hex2:format(REGISTERS.SP))
 
-        print(" CYC:" .. ppu.cycles .. " SL:" .. ppu.scanline)
+            print(" CYC:" .. ppu.cycles .. " SL:" .. ppu.scanline)
+        end
 
+        controller.tick()
         local cycles = cpu.tick(CPU_MEM, REGISTERS, ppu.cycles)
-        ppu.tick(PPU_MEM, cycles)
+
+        CPU_CYCLES = CPU_CYCLES + cycles
+
+        if ppu.tick(PPU_MEM, cycles) then break end
+
+        if i == 100000 then print("PPU ERROR (not ticking fast enough?)") end
     end
 end
 
@@ -89,7 +101,7 @@ function draw_tile(colours, tile_index, tile_x, tile_y)
             local pix = util.get_bit(low, 7 - x)
             pix = pix + util.get_bit(high, 7 - x) * 2
 
-            table.insert(colours[pix], {x + tile_x * 10, y + tile_y * 10})
+            table.insert(colours[pix], {x + tile_x * 8, y + tile_y * 8})
         end
     end
 end
@@ -122,5 +134,7 @@ function love.draw()
 
         love.graphics.setCanvas()
         love.graphics.draw(canv, 0, 0, 0, scale, scale)
+
+        love.graphics.print("CPU_CYCLES: " .. CPU_CYCLES, 0, 0)
     end
 end

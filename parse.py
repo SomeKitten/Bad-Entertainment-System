@@ -1,68 +1,67 @@
 lines = []
 oldlines = []
 debug_lines = []
+finish = False
 write = False
 
-with open("donkeykong_trimmed.log", "r") as f:
-    with open("donkeykong_parsed.log", "w") as f2:
-        with open("donkeykong_portion.log", "w") as f3:
-            with open("debug.log", "r") as debug:
-                with open("debug_portion.log", "w") as debug_portion:
-                    line_number = 0
-                    i = 0
-                    for line in f:
-                        line_number += 1
+line_number = 0
+debug_line_number = 0
 
-                        if line.startswith("["):
-                            continue
+check_size = 10
 
-                        oldlines.append(line)
-                        oldlines = oldlines[-10:]
+with open("donkeykong_longer.log", "r") as f:
+    oldlines = f.readlines()
+    lines = [line[:7] + line[-42:-16] + "\n" for line in oldlines]
 
-                        # line = "PC:" + line[:4] + " " + \
-                        #     line[49:49+25].strip() + " " + \
-                        #     line.strip().split(" ")[-1] + "\n"
-                        line = "PC:" + line[:4] + " " + \
-                            line[49:49+25].strip() + "\n"
+with open("debug.log", "r") as debug:
+    debug_lines = [line[:33] + "\n" for line in debug.readlines()]
 
-                        lines.append(line)
-                        lines = lines[-10:]
+with open("donkeykong_parsed.log", "w") as f2:
+    with open("donkeykong_portion.log", "w") as f3:
+        with open("debug_portion.log", "w") as debug_portion:
+            while line_number < len(lines):
+                line_number += 1
+                debug_line_number += 1
 
-                        debug_line = debug.readline()
-                        # debug_lines.append(debug_line[:33] + " " +
-                        #                    debug_line.split(" ")[-1])
-                        debug_lines.append(debug_line[:33] + "\n")
-                        debug_lines = debug_lines[-10:]
+                while not lines[line_number - 1].startswith("PC"):
+                    line_number += 1
+                while not debug_lines[debug_line_number - 1].startswith("PC"):
+                    debug_line_number += 1
 
-                        test = debug_lines[-1] != lines[-1]
+                equal = debug_lines[debug_line_number -
+                                    1] == lines[line_number - 1]
 
-                        if not write and test:
-                            for _ in range(10000):
-                                debug_line = debug.readline()
-                                # debug_lines.append(debug_line[:33] + " " +
-                                #                    debug_line.split(" ")[-1])
-                                debug_lines.append(debug_line[:33] + "\n")
-                                test = debug_lines[-1] != lines[-1]
-                                if not test:
-                                    break
+                if not equal:
+                    finish = True
 
-                        if not write and test:
-                            print(line_number)
+                    r = lines[line_number - 1:line_number + check_size]
+                    for _ in range(check_size):
+                        debug_line_number += 1
 
-                        if write or test:
-                            write = True
+                        equal = debug_lines[debug_line_number - 1] in r
 
-                            for l in lines:
-                                f2.write(l)
-                            lines.clear()
-                            for ol in oldlines:
-                                f3.write(ol)
-                            oldlines.clear()
-                            for dl in debug_lines:
-                                debug_portion.write(dl)
-                            debug_lines.clear()
+                        if equal:
+                            line_number += r.index(
+                                debug_lines[debug_line_number - 1])
+                            finish = False
+                            break
 
-                            i += 1
+                if finish:
+                    print("Original: " + str(line_number))
+                    print("Debug: " + str(debug_line_number))
 
-                            if i > 100:
-                                break
+                    for i in range(line_number - 11):
+                        f2.write("\n")
+                    for i in range(debug_line_number - 11):
+                        debug_portion.write("\n")
+
+                    for j in range(-10, 89):
+                        l = lines[line_number - 1 + j]
+                        ol = oldlines[line_number - 1 + j]
+                        dl = debug_lines[debug_line_number - 1 + j]
+
+                        f2.write(l)
+                        f3.write(ol)
+                        debug_portion.write(dl)
+
+                    break
