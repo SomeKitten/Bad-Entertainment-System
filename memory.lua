@@ -34,12 +34,14 @@ function memory.read_cpu(mem, addr)
         elseif addr == 0x2001 then
             return mem.PPU_MASK
         elseif addr == 0x2002 then
-            print("READING PPU_STATUS")
+            -- print("READING PPU_STATUS")
 
             local val = mem.PPU_STATUS
 
             mem.PPU_LATCH = 1
             mem.PPU_STATUS = bit.band(mem.PPU_STATUS, 0x7F)
+
+            -- print("READING STATUS: " .. util.hex2:format(val))
 
             return val
         elseif addr == 0x2003 then
@@ -51,11 +53,11 @@ function memory.read_cpu(mem, addr)
         elseif addr == 0x2006 then
             return mem.PPU_ADDR
         elseif addr == 0x2007 then
-            print("READING PPU_ADDR: " .. util.hex4:format(mem.PPU_ADDR))
+            -- print("READING PPU_ADDR: " .. util.hex4:format(mem.PPU_ADDR))
 
             local val = memory.read_ppu(PPU_MEM, bit.band(mem.PPU_ADDR, 0x3FFF))
 
-            if bit.band(mem.PPU_CTRL, 0x04) == 0 then
+            if mem.PPU_INCREMENT == 0 then
                 mem.PPU_ADDR = mem.PPU_ADDR + 1
             else
                 mem.PPU_ADDR = mem.PPU_ADDR + 32
@@ -80,21 +82,43 @@ function memory.write_cpu(mem, addr, val)
         mem.RAM[addr] = val
     elseif addr < 0x4000 then
         -- mirroring
-        addr = ((addr - 0x2000) % 0x0008) + 0x2000
+        addr = (addr % 0x0008) + 0x2000
         if addr == 0x2000 then
             mem.PPU_CTRL = val
+
+            mem.PPU_NAMETABLE = bit.band(val, 0x03)
+            mem.PPU_INCREMENT = bit.band(val, 0x04) / 0x04
+            mem.PPU_SPRITE_ADDR = bit.band(val, 0x08) / 0x08
+            mem.PPU_BACKGROUND = bit.band(val, 0x10) / 0x10
+            mem.PPU_SPRITE_SIZE = bit.band(val, 0x20) / 0x20
+            mem.PPU_NMI = bit.band(val, 0x80) / 0x80
+
+            mem.PPU_STATUS = bit.band(mem.PPU_STATUS, 0xE0) +
+                                 bit.band(val, 0x1F)
         elseif addr == 0x2001 then
             mem.PPU_MASK = val
+
+            mem.PPU_STATUS = bit.band(mem.PPU_STATUS, 0xE0) +
+                                 bit.band(val, 0x1F)
         elseif addr == 0x2002 then
             -- nothing
         elseif addr == 0x2003 then
             mem.PPU_OAM_ADDR = val
+
+            mem.PPU_STATUS = bit.band(mem.PPU_STATUS, 0xE0) +
+                                 bit.band(val, 0x1F)
         elseif addr == 0x2004 then
             mem.PPU_OAM_DATA = val
+
+            mem.PPU_STATUS = bit.band(mem.PPU_STATUS, 0xE0) +
+                                 bit.band(val, 0x1F)
         elseif addr == 0x2005 then
             mem.PPU_SCROLL = val
+
+            mem.PPU_STATUS = bit.band(mem.PPU_STATUS, 0xE0) +
+                                 bit.band(val, 0x1F)
         elseif addr == 0x2006 then
-            print("WRITING TO PPU_ADDR: " .. util.hex2:format(val))
+            -- print("WRITING TO PPU_ADDR: " .. util.hex2:format(val))
 
             if mem.PPU_LATCH == 1 then
                 mem.PPU_LATCH = 0
@@ -104,16 +128,22 @@ function memory.write_cpu(mem, addr, val)
                 mem.PPU_ADDR = mem._PPU_ADDR * 0x100 + val
             end
 
-            print("PPU_ADDR: " .. util.hex4:format(mem.PPU_ADDR))
+            mem.PPU_STATUS = bit.band(mem.PPU_STATUS, 0xE0) +
+                                 bit.band(val, 0x1F)
+
+            -- print("PPU_ADDR: " .. util.hex4:format(mem.PPU_ADDR))
         elseif addr == 0x2007 then
-            print("PPU write to: " .. util.hex4:format(mem.PPU_ADDR))
+            -- print("PPU write to: " .. util.hex4:format(mem.PPU_ADDR))
             memory.write_ppu(PPU_MEM, bit.band(mem.PPU_ADDR, 0x3FFF), val)
 
-            if bit.band(mem.PPU_CTRL, 0x04) == 0 then
+            if mem.PPU_INCREMENT == 0 then
                 mem.PPU_ADDR = mem.PPU_ADDR + 1
             else
                 mem.PPU_ADDR = mem.PPU_ADDR + 32
             end
+
+            mem.PPU_STATUS = bit.band(mem.PPU_STATUS, 0xE0) +
+                                 bit.band(val, 0x1F)
         end
     elseif addr < 0x4020 then
         mem.IO[addr - 0x4000] = val
@@ -168,8 +198,8 @@ function memory.read_ppu(mem, addr, val)
 end
 
 function memory.write_ppu(mem, addr, val)
-    print("PPU write: " .. util.hex4:format(addr) .. " = " ..
-              util.hex2:format(val))
+    -- print("PPU write: " .. util.hex4:format(addr) .. " = " ..
+    --           util.hex2:format(val))
 
     if addr < 0x1000 then
         mem.PATTERNTABLE_0[addr] = val

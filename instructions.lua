@@ -45,6 +45,8 @@ instructions[0x4C] = function(mem, regs)
     local hi = memory.read_cpu(mem, instructions.inc16(regs.PC))
 
     regs.PC = (hi * 0x100) + lo
+
+    return 3
 end
 
 instructions[0xA2] = function(mem, regs)
@@ -59,6 +61,8 @@ instructions[0xA2] = function(mem, regs)
     regs.P = util.set_bit(regs.P, z, 1)
 
     regs.X = val
+
+    return 2
 end
 
 instructions[0x86] = function(mem, regs)
@@ -67,6 +71,8 @@ instructions[0x86] = function(mem, regs)
     regs.PC = instructions.inc16(regs.PC)
 
     memory.write_cpu(mem, addr, regs.X)
+
+    return 3
 end
 
 instructions[0x20] = function(mem, regs)
@@ -81,15 +87,21 @@ instructions[0x20] = function(mem, regs)
     instructions.push(mem, regs, regs.PC % 0x100)
 
     regs.PC = (hi * 0x100) + lo
+
+    return 6
 end
 
 instructions[0xEA] = function(mem, regs)
     -- NOP
+
+    return 2
 end
 
 instructions[0x38] = function(mem, regs)
     -- SEC
     regs.P = util.set_bit(regs.P, 1, 0)
+
+    return 2
 end
 
 instructions[0xB0] = function(mem, regs)
@@ -97,11 +109,16 @@ instructions[0xB0] = function(mem, regs)
     local val = memory.read_cpu(mem, regs.PC)
     regs.PC = instructions.inc16(regs.PC)
     if util.get_bit(regs.P, 0) == 1 then regs.PC = regs.PC + val end
+
+    -- **
+    return 2
 end
 
 instructions[0x18] = function(mem, regs)
     -- CLC
     regs.P = util.set_bit(regs.P, 0, 0)
+
+    return 2
 end
 
 instructions[0x90] = function(mem, regs)
@@ -109,6 +126,9 @@ instructions[0x90] = function(mem, regs)
     local val = memory.read_cpu(mem, regs.PC)
     regs.PC = instructions.inc16(regs.PC)
     if util.get_bit(regs.P, 0) == 0 then regs.PC = regs.PC + val end
+
+    -- **
+    return 2
 end
 
 instructions[0xA9] = function(mem, regs)
@@ -123,6 +143,8 @@ instructions[0xA9] = function(mem, regs)
     regs.P = util.set_bit(regs.P, z, 1)
 
     regs.A = val
+
+    return 2
 end
 
 instructions[0xF0] = function(mem, regs)
@@ -132,7 +154,19 @@ instructions[0xF0] = function(mem, regs)
 
     if val > 0x7F then val = val - 0x100 end
 
-    if util.get_bit(regs.P, 1) == 1 then regs.PC = regs.PC + val end
+    if util.get_bit(regs.P, 1) == 1 then
+        local oldpc = regs.PC
+        regs.PC = regs.PC + val
+
+        if bit.band(regs.PC, 0xFF00) ~= bit.band(oldpc, 0xFF00) then
+            return 4
+        end
+
+        return 3
+    end
+
+    -- **
+    return 2
 end
 
 instructions[0xD0] = function(mem, regs)
@@ -142,7 +176,19 @@ instructions[0xD0] = function(mem, regs)
 
     if val > 0x7F then val = val - 0x100 end
 
-    if util.get_bit(regs.P, 1) == 0 then regs.PC = regs.PC + val end
+    if util.get_bit(regs.P, 1) == 0 then
+        local oldpc = regs.PC
+        regs.PC = regs.PC + val
+
+        if bit.band(regs.PC, 0xFF00) ~= bit.band(oldpc, 0xFF00) then
+            return 4
+        end
+
+        return 3
+    end
+
+    -- **
+    return 2
 end
 
 instructions[0x85] = function(mem, regs)
@@ -151,6 +197,8 @@ instructions[0x85] = function(mem, regs)
     regs.PC = instructions.inc16(regs.PC)
 
     memory.write_cpu(mem, addr, regs.A)
+
+    return 3
 end
 
 instructions[0x24] = function(mem, regs)
@@ -167,6 +215,8 @@ instructions[0x24] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val, 7), 7)
     regs.P = util.set_bit(regs.P, util.get_bit(val, 6), 6)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 3
 end
 
 instructions[0x70] = function(mem, regs)
@@ -177,6 +227,9 @@ instructions[0x70] = function(mem, regs)
 
     regs.PC = instructions.inc16(regs.PC)
     if util.get_bit(regs.P, 6) == 1 then regs.PC = regs.PC + val end
+
+    -- **
+    return 2
 end
 
 instructions[0x50] = function(mem, regs)
@@ -187,6 +240,9 @@ instructions[0x50] = function(mem, regs)
 
     regs.PC = instructions.inc16(regs.PC)
     if util.get_bit(regs.P, 6) == 0 then regs.PC = regs.PC + val end
+
+    -- **
+    return 2
 end
 
 instructions[0x10] = function(mem, regs)
@@ -197,6 +253,9 @@ instructions[0x10] = function(mem, regs)
 
     regs.PC = instructions.inc16(regs.PC)
     if util.get_bit(regs.P, 7) == 0 then regs.PC = regs.PC + val end
+
+    -- **
+    return 2
 end
 
 instructions[0x60] = function(mem, regs)
@@ -206,16 +265,22 @@ instructions[0x60] = function(mem, regs)
 
     regs.PC = (hi * 0x100) + lo
     regs.PC = instructions.inc16(regs.PC)
+
+    return 6
 end
 
 instructions[0x78] = function(mem, regs)
     -- SEI
     regs.P = util.set_bit(regs.P, 1, 2)
+
+    return 2
 end
 
 instructions[0xF8] = function(mem, regs)
     -- SED
     regs.P = util.set_bit(regs.P, 1, 3)
+
+    return 2
 end
 
 instructions[0x08] = function(mem, regs)
@@ -225,6 +290,8 @@ instructions[0x08] = function(mem, regs)
     val = util.set_bit(val, 1, 4)
 
     instructions.push(mem, regs, val)
+
+    return 3
 end
 
 instructions[0x68] = function(mem, regs)
@@ -238,6 +305,8 @@ instructions[0x68] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 4
 end
 
 instructions[0x29] = function(mem, regs)
@@ -252,6 +321,8 @@ instructions[0x29] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 2
 end
 
 instructions[0xC9] = function(mem, regs)
@@ -270,16 +341,22 @@ instructions[0xC9] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val2, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, c, 0)
+
+    return 2
 end
 
 instructions[0xD8] = function(mem, regs)
     -- CLD
     regs.P = util.set_bit(regs.P, 0, 3)
+
+    return 2
 end
 
 instructions[0x48] = function(mem, regs)
     -- PHA
     instructions.push(mem, regs, regs.A)
+
+    return 3
 end
 
 instructions[0x28] = function(mem, regs)
@@ -290,6 +367,8 @@ instructions[0x28] = function(mem, regs)
     val = util.set_bit(val, util.get_bit(regs.P, 4), 4)
 
     regs.P = val
+
+    return 4
 end
 
 instructions[0x30] = function(mem, regs)
@@ -298,6 +377,9 @@ instructions[0x30] = function(mem, regs)
     regs.PC = instructions.inc16(regs.PC)
 
     if util.get_bit(regs.P, 7) == 1 then regs.PC = regs.PC + val end
+
+    -- **
+    return 2
 end
 
 instructions[0x09] = function(mem, regs)
@@ -312,11 +394,15 @@ instructions[0x09] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 2
 end
 
 instructions[0xB8] = function(mem, regs)
     -- CLV
     regs.P = util.set_bit(regs.P, 0, 6)
+
+    return 2
 end
 
 instructions[0x49] = function(mem, regs)
@@ -331,6 +417,8 @@ instructions[0x49] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 2
 end
 
 instructions[0x69] = function(mem, regs)
@@ -355,6 +443,8 @@ instructions[0x69] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = val2 % 256
+
+    return 2
 end
 
 instructions[0xA0] = function(mem, regs)
@@ -369,6 +459,8 @@ instructions[0xA0] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.Y, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 2
 end
 
 instructions[0xC0] = function(mem, regs)
@@ -387,6 +479,8 @@ instructions[0xC0] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val2, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, c, 0)
+
+    return 2
 end
 
 instructions[0xE0] = function(mem, regs)
@@ -405,6 +499,8 @@ instructions[0xE0] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val2, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, c, 0)
+
+    return 2
 end
 
 instructions[0xE9] = function(mem, regs)
@@ -434,6 +530,8 @@ instructions[0xE9] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = result
+
+    return 2
 end
 
 instructions[0xC8] = function(mem, regs)
@@ -445,6 +543,8 @@ instructions[0xC8] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.Y, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 2
 end
 
 instructions[0xE8] = function(mem, regs)
@@ -456,6 +556,8 @@ instructions[0xE8] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.X, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 2
 end
 
 instructions[0x88] = function(mem, regs)
@@ -467,6 +569,8 @@ instructions[0x88] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.Y, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 2
 end
 
 instructions[0xCA] = function(mem, regs)
@@ -478,6 +582,8 @@ instructions[0xCA] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.X, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 2
 end
 
 instructions[0xA8] = function(mem, regs)
@@ -489,6 +595,8 @@ instructions[0xA8] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.Y, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 2
 end
 
 instructions[0xAA] = function(mem, regs)
@@ -500,6 +608,8 @@ instructions[0xAA] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.X, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 2
 end
 
 instructions[0x98] = function(mem, regs)
@@ -511,6 +621,8 @@ instructions[0x98] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 2
 end
 
 instructions[0x8A] = function(mem, regs)
@@ -522,6 +634,8 @@ instructions[0x8A] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 2
 end
 
 instructions[0xBA] = function(mem, regs)
@@ -533,6 +647,8 @@ instructions[0xBA] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.X, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 2
 end
 
 instructions[0x8E] = function(mem, regs)
@@ -543,11 +659,15 @@ instructions[0x8E] = function(mem, regs)
     regs.PC = instructions.inc16(regs.PC)
 
     memory.write_cpu(mem, addr, regs.X)
+
+    return 4
 end
 
 instructions[0x9A] = function(mem, regs)
     -- TXS
     regs.SP = regs.X
+
+    return 2
 end
 
 instructions[0xAE] = function(mem, regs)
@@ -564,6 +684,8 @@ instructions[0xAE] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.X, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 4
 end
 
 instructions[0xAD] = function(mem, regs)
@@ -580,6 +702,8 @@ instructions[0xAD] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 4
 end
 
 instructions[0x40] = function(mem, regs)
@@ -593,6 +717,8 @@ instructions[0x40] = function(mem, regs)
 
     regs.PC = instructions.pull(mem, regs)
     regs.PC = regs.PC + instructions.pull(mem, regs) * 0x100
+
+    return 6
 end
 
 instructions[0x4A] = function(mem, regs)
@@ -607,6 +733,8 @@ instructions[0x4A] = function(mem, regs)
     regs.P = util.set_bit(regs.P, regs.A % 2, 0)
 
     regs.A = val
+
+    return 2
 end
 
 instructions[0x0A] = function(mem, regs)
@@ -621,6 +749,8 @@ instructions[0x0A] = function(mem, regs)
     regs.P = util.set_bit(regs.P, math.floor(regs.A / 0x80), 0)
 
     regs.A = val % 0x100
+
+    return 2
 end
 
 instructions[0x6A] = function(mem, regs)
@@ -638,6 +768,8 @@ instructions[0x6A] = function(mem, regs)
     if regs.A == 0 then z = 1 end
 
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 2
 end
 
 instructions[0x2A] = function(mem, regs)
@@ -655,6 +787,8 @@ instructions[0x2A] = function(mem, regs)
     if regs.A == 0 then z = 1 end
 
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 2
 end
 
 instructions[0xA5] = function(mem, regs)
@@ -669,6 +803,8 @@ instructions[0xA5] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 3
 end
 
 instructions[0x8D] = function(mem, regs)
@@ -679,6 +815,8 @@ instructions[0x8D] = function(mem, regs)
     regs.PC = instructions.inc16(regs.PC)
 
     memory.write_cpu(mem, addr, regs.A)
+
+    return 4
 end
 
 instructions[0xA1] = function(mem, regs)
@@ -698,6 +836,8 @@ instructions[0xA1] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 6
 end
 
 instructions[0x81] = function(mem, regs)
@@ -711,6 +851,8 @@ instructions[0x81] = function(mem, regs)
     indirect = indirect + memory.read_cpu(mem, instructions.inc8(addr)) * 0x100
 
     memory.write_cpu(mem, indirect, regs.A)
+
+    return 6
 end
 
 instructions[0x01] = function(mem, regs)
@@ -730,6 +872,8 @@ instructions[0x01] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 6
 end
 
 instructions[0x21] = function(mem, regs)
@@ -749,6 +893,8 @@ instructions[0x21] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 6
 end
 
 instructions[0x41] = function(mem, regs)
@@ -768,6 +914,8 @@ instructions[0x41] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 6
 end
 
 instructions[0x61] = function(mem, regs)
@@ -799,6 +947,8 @@ instructions[0x61] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = val2 % 256
+
+    return 6
 end
 
 instructions[0xC1] = function(mem, regs)
@@ -824,6 +974,8 @@ instructions[0xC1] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val2, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, c, 0)
+
+    return 6
 end
 
 instructions[0xE1] = function(mem, regs)
@@ -860,6 +1012,8 @@ instructions[0xE1] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = result
+
+    return 6
 end
 
 instructions[0xA4] = function(mem, regs)
@@ -874,6 +1028,8 @@ instructions[0xA4] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.Y, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 3
 end
 
 instructions[0x84] = function(mem, regs)
@@ -882,6 +1038,8 @@ instructions[0x84] = function(mem, regs)
     regs.PC = instructions.inc16(regs.PC)
 
     memory.write_cpu(mem, val, regs.Y)
+
+    return 3
 end
 
 instructions[0xA6] = function(mem, regs)
@@ -896,6 +1054,8 @@ instructions[0xA6] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.X, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 3
 end
 
 instructions[0x05] = function(mem, regs)
@@ -910,6 +1070,8 @@ instructions[0x05] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 3
 end
 
 instructions[0x25] = function(mem, regs)
@@ -924,6 +1086,8 @@ instructions[0x25] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 3
 end
 
 instructions[0x45] = function(mem, regs)
@@ -938,6 +1102,8 @@ instructions[0x45] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 3
 end
 
 instructions[0x65] = function(mem, regs)
@@ -964,6 +1130,8 @@ instructions[0x65] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = val2 % 256
+
+    return 3
 end
 
 instructions[0xC5] = function(mem, regs)
@@ -984,6 +1152,8 @@ instructions[0xC5] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val2, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, c, 0)
+
+    return 3
 end
 
 instructions[0xE5] = function(mem, regs)
@@ -1015,6 +1185,8 @@ instructions[0xE5] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = result
+
+    return 3
 end
 
 instructions[0xE4] = function(mem, regs)
@@ -1035,6 +1207,8 @@ instructions[0xE4] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val2, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, c, 0)
+
+    return 3
 end
 
 instructions[0xC4] = function(mem, regs)
@@ -1055,6 +1229,8 @@ instructions[0xC4] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val2, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, c, 0)
+
+    return 3
 end
 
 instructions[0x46] = function(mem, regs)
@@ -1073,6 +1249,8 @@ instructions[0x46] = function(mem, regs)
     regs.P = util.set_bit(regs.P, val % 2, 0)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 5
 end
 
 instructions[0x06] = function(mem, regs)
@@ -1091,6 +1269,8 @@ instructions[0x06] = function(mem, regs)
     regs.P = util.set_bit(regs.P, math.floor(val / 0x80), 0)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 5
 end
 
 instructions[0x66] = function(mem, regs)
@@ -1116,6 +1296,8 @@ instructions[0x66] = function(mem, regs)
     if val == 0 then z = 1 end
 
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 5
 end
 
 instructions[0x26] = function(mem, regs)
@@ -1141,6 +1323,8 @@ instructions[0x26] = function(mem, regs)
     if val == 0 then z = 1 end
 
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 5
 end
 
 instructions[0xE6] = function(mem, regs)
@@ -1158,6 +1342,8 @@ instructions[0xE6] = function(mem, regs)
     regs.P = util.set_bit(regs.P, math.floor(val2 / 0x80), 7)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 5
 end
 
 instructions[0xC6] = function(mem, regs)
@@ -1175,6 +1361,8 @@ instructions[0xC6] = function(mem, regs)
     regs.P = util.set_bit(regs.P, math.floor(val2 / 0x80), 7)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 5
 end
 
 instructions[0xAC] = function(mem, regs)
@@ -1193,6 +1381,8 @@ instructions[0xAC] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, math.floor(val / 0x80), 7)
+
+    return 4
 end
 
 instructions[0x8C] = function(mem, regs)
@@ -1203,6 +1393,8 @@ instructions[0x8C] = function(mem, regs)
     regs.PC = instructions.inc16(regs.PC)
 
     memory.write_cpu(mem, addr, regs.Y)
+
+    return 4
 end
 
 instructions[0x2C] = function(mem, regs)
@@ -1221,6 +1413,8 @@ instructions[0x2C] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val, 7), 7)
     regs.P = util.set_bit(regs.P, util.get_bit(val, 6), 6)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 4
 end
 
 instructions[0x0D] = function(mem, regs)
@@ -1237,6 +1431,8 @@ instructions[0x0D] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 4
 end
 
 instructions[0x2D] = function(mem, regs)
@@ -1253,6 +1449,8 @@ instructions[0x2D] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 4
 end
 
 instructions[0x4D] = function(mem, regs)
@@ -1269,6 +1467,8 @@ instructions[0x4D] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 4
 end
 
 instructions[0x6D] = function(mem, regs)
@@ -1297,6 +1497,8 @@ instructions[0x6D] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = val2 % 256
+
+    return 4
 end
 
 instructions[0xCD] = function(mem, regs)
@@ -1319,6 +1521,8 @@ instructions[0xCD] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val2, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, c, 0)
+
+    return 4
 end
 
 instructions[0xED] = function(mem, regs)
@@ -1352,6 +1556,8 @@ instructions[0xED] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = result
+
+    return 4
 end
 
 instructions[0xEC] = function(mem, regs)
@@ -1374,6 +1580,8 @@ instructions[0xEC] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val2, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, c, 0)
+
+    return 4
 end
 
 instructions[0xCC] = function(mem, regs)
@@ -1396,6 +1604,8 @@ instructions[0xCC] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val2, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, c, 0)
+
+    return 4
 end
 
 instructions[0x4E] = function(mem, regs)
@@ -1416,6 +1626,8 @@ instructions[0x4E] = function(mem, regs)
     regs.P = util.set_bit(regs.P, val % 2, 0)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 6
 end
 
 instructions[0x0E] = function(mem, regs)
@@ -1436,6 +1648,8 @@ instructions[0x0E] = function(mem, regs)
     regs.P = util.set_bit(regs.P, math.floor(val / 0x80), 0)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 6
 end
 
 instructions[0x6E] = function(mem, regs)
@@ -1463,6 +1677,8 @@ instructions[0x6E] = function(mem, regs)
     if val == 0 then z = 1 end
 
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 6
 end
 
 instructions[0x2E] = function(mem, regs)
@@ -1490,6 +1706,8 @@ instructions[0x2E] = function(mem, regs)
     if val == 0 then z = 1 end
 
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 6
 end
 
 instructions[0xEE] = function(mem, regs)
@@ -1509,6 +1727,8 @@ instructions[0xEE] = function(mem, regs)
     regs.P = util.set_bit(regs.P, math.floor(val2 / 0x80), 7)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 6
 end
 
 instructions[0xCE] = function(mem, regs)
@@ -1528,6 +1748,8 @@ instructions[0xCE] = function(mem, regs)
     regs.P = util.set_bit(regs.P, math.floor(val2 / 0x80), 7)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 6
 end
 
 instructions[0xB1] = function(mem, regs)
@@ -1547,6 +1769,9 @@ instructions[0xB1] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    -- *
+    return 5
 end
 
 instructions[0x11] = function(mem, regs)
@@ -1566,6 +1791,9 @@ instructions[0x11] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    -- *
+    return 5
 end
 
 instructions[0x31] = function(mem, regs)
@@ -1585,6 +1813,9 @@ instructions[0x31] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    -- *
+    return 5
 end
 
 instructions[0x51] = function(mem, regs)
@@ -1604,6 +1835,9 @@ instructions[0x51] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    -- *
+    return 5
 end
 
 instructions[0x71] = function(mem, regs)
@@ -1635,6 +1869,9 @@ instructions[0x71] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = val2 % 256
+
+    -- *
+    return 5
 end
 
 instructions[0xD1] = function(mem, regs)
@@ -1660,6 +1897,9 @@ instructions[0xD1] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val2, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, c, 0)
+
+    -- *
+    return 5
 end
 
 instructions[0xF1] = function(mem, regs)
@@ -1696,6 +1936,9 @@ instructions[0xF1] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = result
+
+    -- *
+    return 5
 end
 
 instructions[0x91] = function(mem, regs)
@@ -1709,6 +1952,8 @@ instructions[0x91] = function(mem, regs)
     indirect = (indirect + regs.Y) % 0x10000
 
     memory.write_cpu(mem, indirect, regs.A)
+
+    return 6
 end
 
 instructions[0x6C] = function(mem, regs)
@@ -1722,6 +1967,8 @@ instructions[0x6C] = function(mem, regs)
     local hi2 = memory.read_cpu(mem, addr)
 
     regs.PC = (hi2 * 0x100) + lo2
+
+    return 5
 end
 
 instructions[0xB9] = function(mem, regs)
@@ -1738,6 +1985,9 @@ instructions[0xB9] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    -- *
+    return 4
 end
 
 instructions[0x19] = function(mem, regs)
@@ -1754,6 +2004,9 @@ instructions[0x19] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    -- *
+    return 4
 end
 
 instructions[0x39] = function(mem, regs)
@@ -1786,6 +2039,9 @@ instructions[0x59] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    -- *
+    return 4
 end
 
 instructions[0x79] = function(mem, regs)
@@ -1814,6 +2070,9 @@ instructions[0x79] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = val2 % 256
+
+    -- *
+    return 4
 end
 
 instructions[0xD9] = function(mem, regs)
@@ -1836,6 +2095,9 @@ instructions[0xD9] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val2, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, c, 0)
+
+    -- *
+    return 4
 end
 
 instructions[0xF9] = function(mem, regs)
@@ -1868,6 +2130,9 @@ instructions[0xF9] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = result
+
+    -- *
+    return 4
 end
 
 instructions[0x99] = function(mem, regs)
@@ -1878,6 +2143,8 @@ instructions[0x99] = function(mem, regs)
     regs.PC = instructions.inc16(regs.PC)
 
     memory.write_cpu(mem, (addr + regs.Y) % 0x10000, regs.A)
+
+    return 5
 end
 
 instructions[0xB4] = function(mem, regs)
@@ -1892,6 +2159,8 @@ instructions[0xB4] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.Y, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 4
 end
 
 instructions[0x94] = function(mem, regs)
@@ -1900,6 +2169,8 @@ instructions[0x94] = function(mem, regs)
     regs.PC = instructions.inc16(regs.PC)
 
     memory.write_cpu(mem, (addr + regs.X) % 0x100, regs.Y)
+
+    return 4
 end
 
 instructions[0x15] = function(mem, regs)
@@ -1914,6 +2185,8 @@ instructions[0x15] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 4
 end
 
 instructions[0x35] = function(mem, regs)
@@ -1928,6 +2201,8 @@ instructions[0x35] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 4
 end
 
 instructions[0x55] = function(mem, regs)
@@ -1942,6 +2217,8 @@ instructions[0x55] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 4
 end
 
 instructions[0x75] = function(mem, regs)
@@ -1968,6 +2245,8 @@ instructions[0x75] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = val2 % 256
+
+    return 4
 end
 
 instructions[0xD5] = function(mem, regs)
@@ -1988,6 +2267,8 @@ instructions[0xD5] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val2, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, c, 0)
+
+    return 4
 end
 
 instructions[0xF5] = function(mem, regs)
@@ -2019,6 +2300,8 @@ instructions[0xF5] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = result
+
+    return 4
 end
 
 instructions[0xB5] = function(mem, regs)
@@ -2033,6 +2316,8 @@ instructions[0xB5] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 4
 end
 
 instructions[0x95] = function(mem, regs)
@@ -2041,6 +2326,8 @@ instructions[0x95] = function(mem, regs)
     regs.PC = instructions.inc16(regs.PC)
 
     memory.write_cpu(mem, (addr + regs.X) % 0x100, regs.A)
+
+    return 4
 end
 
 instructions[0x56] = function(mem, regs)
@@ -2061,6 +2348,8 @@ instructions[0x56] = function(mem, regs)
     regs.P = util.set_bit(regs.P, val % 2, 0)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 6
 end
 
 instructions[0x16] = function(mem, regs)
@@ -2081,6 +2370,8 @@ instructions[0x16] = function(mem, regs)
     regs.P = util.set_bit(regs.P, math.floor(val / 0x80), 0)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 6
 end
 
 instructions[0x76] = function(mem, regs)
@@ -2108,6 +2399,8 @@ instructions[0x76] = function(mem, regs)
     if val == 0 then z = 1 end
 
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 6
 end
 
 instructions[0x36] = function(mem, regs)
@@ -2135,6 +2428,8 @@ instructions[0x36] = function(mem, regs)
     if val == 0 then z = 1 end
 
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 6
 end
 
 instructions[0xF6] = function(mem, regs)
@@ -2154,6 +2449,8 @@ instructions[0xF6] = function(mem, regs)
     regs.P = util.set_bit(regs.P, math.floor(val2 / 0x80), 7)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 6
 end
 
 instructions[0xD6] = function(mem, regs)
@@ -2173,6 +2470,8 @@ instructions[0xD6] = function(mem, regs)
     regs.P = util.set_bit(regs.P, math.floor(val2 / 0x80), 7)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 6
 end
 
 instructions[0xB6] = function(mem, regs)
@@ -2187,6 +2486,8 @@ instructions[0xB6] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.X, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 4
 end
 
 instructions[0x96] = function(mem, regs)
@@ -2195,6 +2496,8 @@ instructions[0x96] = function(mem, regs)
     regs.PC = instructions.inc16(regs.PC)
 
     memory.write_cpu(mem, (addr + regs.Y) % 0x100, regs.X)
+
+    return 4
 end
 
 instructions[0xBC] = function(mem, regs)
@@ -2213,6 +2516,9 @@ instructions[0xBC] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, math.floor(val / 0x80), 7)
+
+    -- *
+    return 4
 end
 
 instructions[0x1D] = function(mem, regs)
@@ -2229,6 +2535,9 @@ instructions[0x1D] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    -- *
+    return 4
 end
 
 instructions[0x3D] = function(mem, regs)
@@ -2245,6 +2554,9 @@ instructions[0x3D] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    -- *
+    return 4
 end
 
 instructions[0x5D] = function(mem, regs)
@@ -2261,6 +2573,9 @@ instructions[0x5D] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    -- *
+    return 4
 end
 
 instructions[0x7D] = function(mem, regs)
@@ -2311,6 +2626,9 @@ instructions[0xDD] = function(mem, regs)
     regs.P = util.set_bit(regs.P, util.get_bit(val2, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
     regs.P = util.set_bit(regs.P, c, 0)
+
+    -- *
+    return 4
 end
 
 instructions[0xFD] = function(mem, regs)
@@ -2344,6 +2662,9 @@ instructions[0xFD] = function(mem, regs)
     regs.P = util.set_bit(regs.P, v, 6)
 
     regs.A = result
+
+    -- *
+    return 4
 end
 
 instructions[0xBD] = function(mem, regs)
@@ -2360,6 +2681,9 @@ instructions[0xBD] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    -- *
+    return 4
 end
 
 instructions[0x9D] = function(mem, regs)
@@ -2370,6 +2694,8 @@ instructions[0x9D] = function(mem, regs)
     regs.PC = instructions.inc16(regs.PC)
 
     memory.write_cpu(mem, addr + regs.X, regs.A)
+
+    return 5
 end
 
 instructions[0x5E] = function(mem, regs)
@@ -2392,6 +2718,8 @@ instructions[0x5E] = function(mem, regs)
     regs.P = util.set_bit(regs.P, val % 2, 0)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 7
 end
 
 instructions[0x1E] = function(mem, regs)
@@ -2414,6 +2742,8 @@ instructions[0x1E] = function(mem, regs)
     regs.P = util.set_bit(regs.P, math.floor(val / 0x80), 0)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 7
 end
 
 instructions[0x7E] = function(mem, regs)
@@ -2443,6 +2773,8 @@ instructions[0x7E] = function(mem, regs)
     if val == 0 then z = 1 end
 
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 7
 end
 
 instructions[0x3E] = function(mem, regs)
@@ -2472,6 +2804,8 @@ instructions[0x3E] = function(mem, regs)
     if val == 0 then z = 1 end
 
     regs.P = util.set_bit(regs.P, z, 1)
+
+    return 7
 end
 
 instructions[0xFE] = function(mem, regs)
@@ -2493,6 +2827,8 @@ instructions[0xFE] = function(mem, regs)
     regs.P = util.set_bit(regs.P, math.floor(val2 / 0x80), 7)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 7
 end
 
 instructions[0xDE] = function(mem, regs)
@@ -2514,6 +2850,8 @@ instructions[0xDE] = function(mem, regs)
     regs.P = util.set_bit(regs.P, math.floor(val2 / 0x80), 7)
 
     memory.write_cpu(mem, addr, val2)
+
+    return 7
 end
 
 instructions[0xBE] = function(mem, regs)
@@ -2532,6 +2870,9 @@ instructions[0xBE] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.X, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    -- *
+    return 4
 end
 
 -- LOTS OF NOP
@@ -3438,6 +3779,9 @@ instructions[0x3B] = function(mem, regs)
     -- AND
     regs.PC = pc
     instructions[0x39](mem, regs)
+
+    -- *
+    return 4
 end
 
 instructions[0x3F] = function(mem, regs)
@@ -3648,6 +3992,8 @@ instructions[0x6F] = function(mem, regs)
     -- ADC
     regs.PC = pc
     instructions[0x6D](mem, regs)
+
+    return 4
 end
 
 instructions[0x73] = function(mem, regs)
@@ -3745,6 +4091,9 @@ instructions[0x7F] = function(mem, regs)
     -- ADC
     regs.PC = pc
     instructions[0x7D](mem, regs)
+
+    -- *
+    return 4
 end
 
 return instructions

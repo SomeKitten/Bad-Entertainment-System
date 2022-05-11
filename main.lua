@@ -1,6 +1,6 @@
 local instructions = require "instructions"
 ROMS_DIR = "/home/kitten/プロジェクト/Roms/NES/"
-ROM = "nestest.nes"
+ROM = "donkeykong.nes"
 
 local util = require("./util")
 local memory = require("./memory")
@@ -16,9 +16,9 @@ function love.load()
     REGISTERS.A = 0
     REGISTERS.X = 0
     REGISTERS.Y = 0
-    REGISTERS.SP = 0
+    REGISTERS.SP = 0xFD
     REGISTERS.PC = 0
-    REGISTERS.P = 0
+    REGISTERS.P = 0x24
 
     -- NES CPU MEMORY
     CPU_MEM = {}
@@ -28,10 +28,6 @@ function love.load()
     PPU_MEM = {}
     memory.init_ppu(PPU_MEM)
 
-    -- DEBUG
-    REGISTERS.PC = 0xC000
-    REGISTERS.SP = 0xFD
-    REGISTERS.P = 0x24
     local f = io.open("debug.log", "w")
     f:close()
 
@@ -41,66 +37,56 @@ function love.load()
                        0xC000 - 0x4020, 0x4000)
 
     util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"), PPU_MEM.PATTERNTABLE_0,
-                       0x0010 + 0x4000, 0, 0x2000)
-
-    -- local copy_start = 0xC000 - 0x4020
-    -- for i = copy_start, copy_start + 0x0FFF do
-    --     PPU_MEM.PATTERNTABLE_0[i - copy_start] = CPU_MEM.CART[i]
-    -- end
-
-    -- for i = copy_start + 0x1000, copy_start + 0x1FFF do
-    --     PPU_MEM.PATTERNTABLE_1[i - (copy_start + 0x1000)] = CPU_MEM.CART[i]
-    -- end
+                       0x0010 + 0x4000, 0, 0x1000)
+    util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"), PPU_MEM.PATTERNTABLE_1,
+                       0x0010 + 0x5000, 0, 0x1000)
 
     REGISTERS.PC = memory.read_cpu(CPU_MEM, 0xFFFD) * 0x100 +
                        memory.read_cpu(CPU_MEM, 0xFFFC)
 
-    NMI = false
+    -- DEBUG
+    REGISTERS.A = 0x3C
+    REGISTERS.X = 0xFF
+    REGISTERS.Y = 0xAA
+    REGISTERS.SP = 0xFA
+    REGISTERS.P = 0x04
+    CPU_MEM.PPU_STATUS = 0x10
 
-    print("RESET VEC:" .. util.hex4:format(REGISTERS.PC))
+    NMI_OCCURRED = 0
 
-    QUIT = false
+    -- print("RESET VEC:" .. util.hex4:format(REGISTERS.PC))
+
+    RENDER = false
 end
 
 function love.update(dt)
     --    TODO Assumes that each instruction is 3 cycles
     for i = 0, 29780 / 3 do
-        if QUIT then return end
-        local cycles = cpu.tick(CPU_MEM, REGISTERS)
+        if RENDER then return end
+
+        io.write("PC:" .. util.hex4:format(REGISTERS.PC) .. " A:" ..
+                     util.hex2:format(REGISTERS.A) .. " X:" ..
+                     util.hex2:format(REGISTERS.X) .. " Y:" ..
+                     util.hex2:format(REGISTERS.Y) .. " P:" ..
+                     util.hex2:format(REGISTERS.P) .. " SP:" ..
+                     util.hex2:format(REGISTERS.SP))
+
+        print(" CYC:" .. ppu.cycles .. " SL:" .. ppu.scanline)
+
+        local cycles = cpu.tick(CPU_MEM, REGISTERS, ppu.cycles)
         ppu.tick(PPU_MEM, cycles)
-
-        if NMI and REGISTERS.P >= 0x80 then
-            print("NMI")
-            NMI = false
-
-            -- push hi
-            instructions.push(CPU_MEM, REGISTERS,
-                              math.floor(REGISTERS.PC / 0x100))
-            -- push lo
-            instructions.push(CPU_MEM, REGISTERS, REGISTERS.PC % 0x100)
-
-            local val = REGISTERS.P
-            val = util.set_bit(val, 1, 5)
-            val = util.set_bit(val, 1, 4)
-
-            instructions.push(CPU_MEM, REGISTERS, val)
-
-            REGISTERS.PC = memory.read_cpu(CPU_MEM, 0xFFFA) +
-                               memory.read_cpu(CPU_MEM, 0xFFFB) * 0x100
-
-            print("NMI VEC: " .. util.hex4:format(REGISTERS.PC))
-        end
     end
 end
 
 function draw_tile(colours, tile_index, tile_x, tile_y)
+    local patterntable = PPU_MEM["PATTERNTABLE_" .. CPU_MEM.PPU_BACKGROUND]
+
     for y = 0, 7 do
-        local low = PPU_MEM.PATTERNTABLE_0[tile_index * 0x10 + y]
-        local high = PPU_MEM.PATTERNTABLE_0[tile_index * 0x10 + y + 8]
+        local low = patterntable[tile_index * 0x10 + y]
+        local high = patterntable[tile_index * 0x10 + y + 8]
 
         for x = 0, 7 do
-            -- local pix = util.get_bit(low, x)
-            local pix = 0
+            local pix = util.get_bit(low, 7 - x)
             pix = pix + util.get_bit(high, 7 - x) * 2
 
             table.insert(colours[pix], {x + tile_x * 10, y + tile_y * 10})
@@ -109,13 +95,17 @@ function draw_tile(colours, tile_index, tile_x, tile_y)
 end
 
 function love.draw()
-    if QUIT then
+    if RENDER then
         local colours = {}
         for i = 0, 3 do colours[i] = {} end
 
+        local nametable = PPU_MEM["NAMETABLE_" .. CPU_MEM.PPU_NAMETABLE]
+
         for x = 0, 0x1F do
             for y = 0, 0x1F do
-                local tile = PPU_MEM.NAMETABLE_0[x + y * 0x20]
+                local tile = nametable[x + y * 0x20]
+
+                -- print(util.hex2:format(tile))
 
                 draw_tile(colours, tile, x, y)
             end
