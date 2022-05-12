@@ -101,7 +101,8 @@ function love.update(dt)
     end
 end
 
-function draw_tile(c, tile_index, table_index, p, tile_x, tile_y)
+function draw_tile(c, tile_index, table_index, p, tile_x, tile_y, flip_horiz,
+                   flip_vert)
     local patterntable = PPU_MEM["PATTERNTABLE_" .. table_index]
     local palette = PPU_MEM.PALETTE[p]
 
@@ -109,11 +110,18 @@ function draw_tile(c, tile_index, table_index, p, tile_x, tile_y)
         local low = patterntable[tile_index * 0x10 + y]
         local high = patterntable[tile_index * 0x10 + y + 8]
 
+        if flip_vert == 1 then y = 7 - y end
+
         for x = 0, 7 do
             local pix = util.get_bit(low, 7 - x)
             pix = pix + util.get_bit(high, 7 - x) * 2
 
-            table.insert(c[palette[pix - 1]], {x + tile_x + 1, y + tile_y + 1})
+            if pix ~= 0 then
+                if flip_horiz == 1 then x = 7 - x end
+
+                table.insert(c[palette[pix - 1]],
+                             {x + tile_x + 1, y + tile_y + 1})
+            end
         end
     end
 end
@@ -162,11 +170,15 @@ function love.draw()
         for i = 0x00, 0x3F do colours[i] = {} end
 
         for i = 0, 63 do
-            local palette = bit.band(PPU_MEM.OAM[i * 4 + 2], 0x03)
+            local attr = PPU_MEM.OAM[i * 4 + 2]
+            local palette = bit.band(attr, 0x03)
+
+            local flip_horiz = util.get_bit(attr, 6)
+            local flip_vert = util.get_bit(attr, 7)
 
             draw_tile(colours, PPU_MEM.OAM[i * 4 + 1], CPU_MEM.PPU_SPRITE_ADDR,
                       "SPP" .. palette, PPU_MEM.OAM[i * 4 + 3],
-                      PPU_MEM.OAM[i * 4] + 1)
+                      PPU_MEM.OAM[i * 4] + 1, flip_horiz, flip_vert)
         end
 
         for i, v in pairs(colours) do
