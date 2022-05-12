@@ -41,6 +41,17 @@ function love.load()
     util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"), PPU_MEM.PATTERNTABLE_1,
                        0x0010 + 0x5000, 0, 0x1000)
 
+    local palette = {}
+    util.file_to_bytes(io.open("./NES Classic Edition.pal", "r"), palette, 0, 0,
+                       192)
+
+    COLOUR_PALETTE = {}
+    for i = 0, 63 do
+        COLOUR_PALETTE[i] = {
+            palette[i * 3], palette[i * 3 + 1], palette[i * 3 + 2]
+        }
+    end
+
     REGISTERS.PC = memory.read_cpu(CPU_MEM, 0xFFFD) * 0x100 +
                        memory.read_cpu(CPU_MEM, 0xFFFC)
 
@@ -90,8 +101,9 @@ function love.update(dt)
     end
 end
 
-function draw_tile(colours, tile_index, tile_x, tile_y)
-    local patterntable = PPU_MEM["PATTERNTABLE_" .. CPU_MEM.PPU_BACKGROUND]
+function draw_tile(c, tile_index, table_index, p, tile_x, tile_y)
+    local patterntable = PPU_MEM["PATTERNTABLE_" .. table_index]
+    local palette = PPU_MEM.PALETTE[p]
 
     for y = 0, 7 do
         local low = patterntable[tile_index * 0x10 + y]
@@ -101,38 +113,74 @@ function draw_tile(colours, tile_index, tile_x, tile_y)
             local pix = util.get_bit(low, 7 - x)
             pix = pix + util.get_bit(high, 7 - x) * 2
 
-            table.insert(colours[pix], {x + tile_x * 8, y + tile_y * 8})
+            table.insert(c[palette[pix - 1]], {x + tile_x + 1, y + tile_y + 1})
         end
     end
 end
 
 function love.draw()
     if RENDER then
+        local canv = love.graphics.newCanvas(256, 240)
+        love.graphics.setCanvas(canv)
+
         local colours = {}
-        for i = 0, 3 do colours[i] = {} end
+        for i = 0x00, 0x3F do colours[i] = {} end
 
         local nametable = PPU_MEM["NAMETABLE_" .. CPU_MEM.PPU_NAMETABLE]
 
-        for x = 0, 0x1F do
-            for y = 0, 0x1F do
+        for y = 0, 0x1F do
+            for x = 0, 0x1D do
                 local tile = nametable[x + y * 0x20]
 
-                -- print(util.hex2:format(tile))
+                local attr_x = math.floor(x / 2)
+                local attr_y = math.floor(y / 2)
 
-                draw_tile(colours, tile, x, y)
+                local attr = nametable[0x3C0 + math.floor(attr_x / 2) +
+                                 math.floor(attr_y / 2) * 0x08]
+
+                local corner_x = attr_x % 2
+                local corner_y = attr_y % 2
+
+                local corner = bit.band(bit.rshift(attr,
+                                                   corner_y * 4 + corner_x * 2),
+                                        3)
+
+                draw_tile(colours, tile, CPU_MEM.PPU_BACKGROUND,
+                          "BGP" .. corner, x * 8, y * 8)
             end
         end
 
-        local canv = love.graphics.newCanvas(256, 240)
-        love.graphics.setCanvas(canv)
         for i, v in pairs(colours) do
-            love.graphics.setColor(i / 3, i / 3, i / 3)
+            love.graphics.setColor(COLOUR_PALETTE[i][1] / 255,
+                                   COLOUR_PALETTE[i][2] / 255,
+                                   COLOUR_PALETTE[i][3] / 255)
+
+            love.graphics.points(v)
+        end
+
+        colours = {}
+        for i = 0x00, 0x3F do colours[i] = {} end
+
+        for i = 0, 63 do
+            local palette = bit.band(PPU_MEM.OAM[i * 4 + 2], 0x03)
+
+            draw_tile(colours, PPU_MEM.OAM[i * 4 + 1], CPU_MEM.PPU_SPRITE_ADDR,
+                      "SPP" .. palette, PPU_MEM.OAM[i * 4 + 3],
+                      PPU_MEM.OAM[i * 4] + 1)
+        end
+
+        for i, v in pairs(colours) do
+            love.graphics.setColor(COLOUR_PALETTE[i][1] / 255,
+                                   COLOUR_PALETTE[i][2] / 255,
+                                   COLOUR_PALETTE[i][3] / 255)
+
             love.graphics.points(v)
         end
 
         local scale = 3
 
         love.graphics.setCanvas()
+        love.graphics.setColor(1, 1, 1)
         love.graphics.draw(canv, 0, 0, 0, scale, scale)
 
         love.graphics.print("CPU_CYCLES: " .. CPU_CYCLES, 0, 0)

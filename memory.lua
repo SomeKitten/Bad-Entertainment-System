@@ -157,7 +157,7 @@ function memory.write_cpu(mem, addr, val)
         end
     elseif addr < 0x4020 then
         if addr == 0x4014 then
-            print("OAM DMA: " .. util.hex2:format(val))
+            -- print("OAM DMA: " .. util.hex2:format(val))
             for i = 0, 255 do
                 PPU_MEM.OAM[i] = memory.read_cpu(mem, val * 0x100 + i)
             end
@@ -176,12 +176,27 @@ end
 function memory.init_ppu(mem)
     mem.PATTERNTABLE_0 = {}
     mem.PATTERNTABLE_1 = {}
+
     mem.NAMETABLE_0 = {}
     mem.NAMETABLE_1 = {}
     mem.NAMETABLE_2 = {}
     mem.NAMETABLE_3 = {}
+
     mem.PALETTE = {}
+
     mem.OAM = {}
+
+    mem.UBGP = 0x0F
+
+    mem.PALETTE.BGP0 = {}
+    mem.PALETTE.BGP1 = {}
+    mem.PALETTE.BGP2 = {}
+    mem.PALETTE.BGP3 = {}
+
+    mem.PALETTE.SPP0 = {}
+    mem.PALETTE.SPP1 = {}
+    mem.PALETTE.SPP2 = {}
+    mem.PALETTE.SPP3 = {}
 
     for i = 0, 0xFFF do mem.PATTERNTABLE_0[i] = 0 end
     for i = 0, 0xFFF do mem.PATTERNTABLE_1[i] = 0 end
@@ -191,6 +206,18 @@ function memory.init_ppu(mem)
     for i = 0, 0x3FF do mem.NAMETABLE_3[i] = 0 end
     for i = 0, 0x1F do mem.PALETTE[i] = 0 end
     for i = 0, 0xFF do mem.OAM[i] = 0 end
+
+    for i = -1, 2 do
+        mem.PALETTE.BGP0[i] = 0x0F
+        mem.PALETTE.BGP1[i] = 0x0F
+        mem.PALETTE.BGP2[i] = 0x0F
+        mem.PALETTE.BGP3[i] = 0x0F
+
+        mem.PALETTE.SPP0[i] = 0x0F
+        mem.PALETTE.SPP1[i] = 0x0F
+        mem.PALETTE.SPP2[i] = 0x0F
+        mem.PALETTE.SPP3[i] = 0x0F
+    end
 end
 
 function memory.read_ppu(mem, addr, val)
@@ -207,7 +234,33 @@ function memory.read_ppu(mem, addr, val)
     elseif addr < 0x3000 then
         return mem.NAMETABLE_3[addr - 0x3800]
     elseif addr < 0x3F20 then
-        return mem.PALETTE[addr - 0x3C00]
+        if addr == 0x3F04 or addr == 0x3F08 or addr == 0x3F0C then
+            return mem.PALETTE[addr - 0x3F00]
+        end
+
+        if addr == 0x3F10 or addr == 0x3F14 or addr == 0x3F18 or addr == 0x3F1C then
+            addr = addr - 0x10
+        end
+
+        if addr == 0x3F00 then
+            return mem.PALETTE.UBGP
+        elseif addr < 0x3F04 then
+            return mem.PALETTE.BGP0[addr - 0x3F01]
+        elseif addr < 0x3F08 then
+            return mem.PALETTE.BGP1[addr - 0x3F05]
+        elseif addr < 0x3F0C then
+            return mem.PALETTE.BGP2[addr - 0x3F09]
+        elseif addr < 0x3F10 then
+            return mem.PALETTE.BGP3[addr - 0x3F0D]
+        elseif addr < 0x3F14 then
+            return mem.PALETTE.SPP0[addr - 0x3F11]
+        elseif addr < 0x3F18 then
+            return mem.PALETTE.SPP1[addr - 0x3F15]
+        elseif addr < 0x3F1C then
+            return mem.PALETTE.SPP2[addr - 0x3F19]
+        else
+            return mem.PALETTE.SPP3[addr - 0x3F1D]
+        end
     elseif addr < 0x4000 then
         return mem.OAM[addr - 0x3F00]
     else
@@ -233,7 +286,37 @@ function memory.write_ppu(mem, addr, val)
     elseif addr < 0x3000 then
         mem.NAMETABLE_3[addr - 0x3800] = val
     elseif addr < 0x3F20 then
-        mem.PALETTE[addr - 0x3C00] = val
+        if addr == 0x3F04 or addr == 0x3F08 or addr == 0x3F0C then
+            mem.PALETTE[addr - 0x3F00] = val
+            return
+        end
+
+        if addr == 0x3F10 or addr == 0x3F14 or addr == 0x3F18 or addr == 0x3F1C then
+            addr = addr - 0x10
+        end
+
+        -- print("WRITING TO PALETTE AT " .. util.hex4:format(addr) .. ": " ..
+        --           util.hex2:format(val))
+
+        if addr == 0x3F00 then
+            mem.PALETTE.UBGP = val
+        elseif addr < 0x3F04 then
+            mem.PALETTE.BGP0[addr - 0x3F01] = val
+        elseif addr < 0x3F08 then
+            mem.PALETTE.BGP1[addr - 0x3F05] = val
+        elseif addr < 0x3F0C then
+            mem.PALETTE.BGP2[addr - 0x3F09] = val
+        elseif addr < 0x3F10 then
+            mem.PALETTE.BGP3[addr - 0x3F0D] = val
+        elseif addr < 0x3F14 then
+            mem.PALETTE.SPP0[addr - 0x3F11] = val
+        elseif addr < 0x3F18 then
+            mem.PALETTE.SPP1[addr - 0x3F15] = val
+        elseif addr < 0x3F1C then
+            mem.PALETTE.SPP2[addr - 0x3F19] = val
+        else
+            mem.PALETTE.SPP3[addr - 0x3F1D] = val
+        end
     elseif addr < 0x4000 then
         mem.OAM[addr - 0x3F00] = val
     else
