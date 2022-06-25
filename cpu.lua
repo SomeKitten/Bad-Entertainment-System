@@ -7,8 +7,6 @@ cpu.instructions_ran = 0
 cpu.cycles_ran = 0
 
 function cpu.tick(mem, regs)
-    if regs.PC == 0xFFEE then print(string.char(regs.A)) end
-
     local inst = memory.read_cpu(mem, regs.PC)
 
     -- print("inst: " .. util.hex2:format(inst))

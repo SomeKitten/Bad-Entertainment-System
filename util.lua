@@ -63,6 +63,8 @@ function util.set_bit(value, b, i)
 end
 
 function util.get_bit(value, i)
+    if value == nil then error("'value' passsed to util.get_bit is nil") end
+    if i == nil then error("'i' passsed to util.get_bit is nil") end
     return bit.rshift(bit.band(value, bit.lshift(1, i)), i)
 end
 

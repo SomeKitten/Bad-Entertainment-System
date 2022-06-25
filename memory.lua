@@ -11,13 +11,28 @@ function memory.init_cpu(mem)
     mem.PPU_LATCH = 0
 
     mem.PPU_CTRL = 0
+    mem.PPU_NAMETABLE = 0
+    mem.PPU_INCREMENT = 0
+    mem.PPU_SPRITE_ADDR = 0
+    mem.PPU_BACKGROUND = 0
+    mem.PPU_SPRITE_SIZE = 0
+    mem.PPU_NMI = 0
+
     mem.PPU_MASK = 0
     mem.PPU_STATUS = 0
-    mem.PPU_OAM_ADDR = 0
-    mem.PPU_OAM_DATA = 0
     mem.PPU_SCROLL = 0
     mem.PPU_ADDR = 0
     mem.PPU_DATA = 0
+
+    mem.mapper = {}
+
+    mem.mapper.CART_SHIFT = 0
+    mem.mapper.CART_SHIFT_COUNTER = 0
+
+    mem.mapper.PRG_MODE = 0
+    mem.mapper.CHR_BANK_0 = 0
+    mem.mapper.CHR_BANK_1 = 0
+    mem.mapper.PRG_BANK = 0
 
     for i = 0, 0x7FF do mem.RAM[i] = 0 end
     for i = 0, 0x7 do mem.PPU[i] = 0 end
@@ -26,9 +41,26 @@ function memory.init_cpu(mem)
 end
 
 function memory.read_cpu(mem, addr)
+    if mem == nil then error("'mem' passsed to memory.read_cpu is nil") end
+    if addr == nil then error("'addr' passsed to memory.read_cpu is nil") end
+
+    local ret = memory.read_cpu_inner(mem, addr)
+
+    if ret == nil then
+        error("The value read from CPU addr " .. util.hex4:format(addr) ..
+                  " is nil")
+    end
+
+    return ret
+end
+
+function memory.read_cpu_inner(mem, addr)
     if addr < 0x2000 then
+        addr = bit.band(addr, 0x07FF)
         return mem.RAM[addr]
     elseif addr < 0x4000 then
+        -- mirroring
+        addr = (addr % 0x0008) + 0x2000
         if addr == 0x2000 then
             return mem.PPU_CTRL
         elseif addr == 0x2001 then
@@ -45,16 +77,16 @@ function memory.read_cpu(mem, addr)
 
             return val
         elseif addr == 0x2003 then
+            -- print("READ OAM_ADDR: " .. mem.PPU_OAM_ADDR)
+
             return mem.PPU_OAM_ADDR
         elseif addr == 0x2004 then
-            return mem.PPU_OAM_DATA
+            return PPU_MEM.OAM[mem.PPU_OAM_ADDR]
         elseif addr == 0x2005 then
             return mem.PPU_SCROLL
         elseif addr == 0x2006 then
             return mem.PPU_ADDR
         elseif addr == 0x2007 then
-            -- print("READING PPU_ADDR: " .. util.hex4:format(mem.PPU_ADDR))
-
             local val = memory.read_ppu(PPU_MEM, bit.band(mem.PPU_ADDR, 0x3FFF))
 
             if mem.PPU_INCREMENT == 0 then
@@ -65,7 +97,7 @@ function memory.read_cpu(mem, addr)
 
             return val
         else
-            print("PPU ADDRESS NOT SUPPORTED: " .. util.hex4:format(addr))
+            print("Memory read error (CPU): " .. util.hex4:format(addr))
         end
     elseif addr < 0x4020 then
         if addr == 0x4016 then
@@ -79,16 +111,45 @@ function memory.read_cpu(mem, addr)
         else
             return mem.IO[addr - 0x4000]
         end
-    elseif addr < 0xFFFF then
-        return mem.CART[addr - 0x4020]
+    elseif addr <= 0xFFFF then
+        if MAPPER == 1 then
+            if addr >= 0x8000 then
+                if mem.mapper.PRG_MODE <= 1 then
+                    return FULL_ROM[0x2000 * mem.mapper.PRG_BANK +
+                               bit.band(addr, 0x7FFF)]
+                end
+                if addr < 0xC000 then
+                    if mem.mapper.PRG_MODE == 2 then
+                        return FULL_ROM[bit.band(addr, 0x1FFF)]
+                    else
+                        return FULL_ROM[0x2000 * mem.mapper.PRG_BANK +
+                                   bit.band(addr, 0x3FFF)]
+                    end
+                else
+                    if mem.mapper.PRG_MODE == 3 then
+                        return FULL_ROM[0x2000 * (PRG_BANKS - 1) +
+                                   bit.band(addr, 0x3FFF)]
+                    else
+                        return FULL_ROM[0x2000 * mem.mapper.PRG_BANK +
+                                   bit.band(addr, 0x3FFF)]
+                    end
+                end
+            end
+
+            print("PRG RAM NOT IMPLEMENTED")
+            return 0
+        else
+            return mem.CART[addr - 0x4020]
+        end
     else
-        print("Memory read error (CPU): " .. addr)
+        print("Memory read error (CPU): " .. util.hex4:format(addr))
         return 0
     end
 end
 
 function memory.write_cpu(mem, addr, val)
     if addr < 0x2000 then
+        addr = bit.band(addr, 0x07FF)
         mem.RAM[addr] = val
     elseif addr < 0x4000 then
         -- mirroring
@@ -113,12 +174,16 @@ function memory.write_cpu(mem, addr, val)
         elseif addr == 0x2002 then
             -- nothing
         elseif addr == 0x2003 then
+            -- print("WRITE OAM_ADDR: " .. val)
+
             mem.PPU_OAM_ADDR = val
 
             mem.PPU_STATUS = bit.band(mem.PPU_STATUS, 0xE0) +
                                  bit.band(val, 0x1F)
         elseif addr == 0x2004 then
-            mem.PPU_OAM_DATA = val
+            PPU_MEM.OAM[mem.PPU_OAM_ADDR] = val
+
+            mem.PPU_OAM_ADDR = mem.PPU_OAM_ADDR + 1
 
             mem.PPU_STATUS = bit.band(mem.PPU_STATUS, 0xE0) +
                                  bit.band(val, 0x1F)
@@ -159,17 +224,49 @@ function memory.write_cpu(mem, addr, val)
         if addr == 0x4014 then
             -- print("OAM DMA: " .. util.hex2:format(val))
             for i = 0, 255 do
-                PPU_MEM.OAM[i] = memory.read_cpu(mem, val * 0x100 + i)
+                PPU_MEM.OAM[(i + mem.PPU_OAM_ADDR) % 256] =
+                    memory.read_cpu(mem, val * 0x100 + i)
             end
         elseif addr == 0x4016 then
             CONTROLLER_POLL = val % 2
         else
             mem.IO[addr - 0x4000] = val
         end
-    elseif addr < 0xFFFF then
-        mem.CART[addr - 0x4020] = val
+    elseif addr <= 0xFFFF then
+        if MAPPER == 1 and addr >= 0x8000 then
+            if val >= 0x80 then
+                mem.mapper.CART_SHIFT = 0
+                mem.mapper.CART_SHIFT_COUNTER = 0
+            else
+                mem.mapper.CART_SHIFT_COUNTER =
+                    mem.mapper.CART_SHIFT_COUNTER + 1
+                mem.mapper.CART_SHIFT = bit.rshift(mem.mapper.CART_SHIFT, 1) +
+                                            bit.band(val, 1) * 16
+
+                if mem.mapper.CART_SHIFT_COUNTER == 5 then
+                    mem.mapper.CART_SHIFT_COUNTER = 0
+
+                    if addr < 0xA000 then
+                        mem.mapper.CONTROL = mem.mapper.CART_SHIFT
+                        mem.mapper.PRG_MODE =
+                            bit.band(mem.mapper.CONTROL, 0x0C) / 0x04
+                        mem.mapper.CHR_MODE = bit.rshift(mem.mapper.CONTROL, 4)
+                    elseif addr < 0xC000 then
+                        mem.mapper.CHR_BANK_0 = mem.mapper.CART_SHIFT
+                    elseif addr < 0xE000 then
+                        mem.mapper.CHR_BANK_1 = mem.mapper.CART_SHIFT
+                    else
+                        mem.mapper.PRG_BANK = mem.mapper.CART_SHIFT
+                    end
+
+                    mem.mapper.CART_SHIFT = 0
+                end
+            end
+        else
+            mem.CART[addr - 0x4020] = val
+        end
     else
-        print("Memory write error (CPU): " .. addr)
+        print("Memory write error (CPU): " .. util.hex4:format(addr))
     end
 end
 
@@ -186,7 +283,7 @@ function memory.init_ppu(mem)
 
     mem.OAM = {}
 
-    mem.UBGP = 0x0F
+    mem.PALETTE.UBGP = 0x0F
 
     mem.PALETTE.BGP0 = {}
     mem.PALETTE.BGP1 = {}
@@ -220,11 +317,34 @@ function memory.init_ppu(mem)
     end
 end
 
-function memory.read_ppu(mem, addr, val)
+function memory.read_ppu(mem, addr)
+    if mem == nil then error("'mem' passsed to memory.read_ppu is nil") end
+    if addr == nil then error("'addr' passsed to memory.read_ppu is nil") end
+
+    local ret = memory.read_ppu_inner(mem, addr)
+
+    if ret == nil then
+        error("The value read from PPU addr " .. util.hex4:format(addr) ..
+                  " is nil")
+    end
+
+    return ret
+end
+
+function memory.read_ppu_inner(mem, addr)
     if addr < 0x1000 then
-        return mem.PATTERNTABLE_0[addr]
+        if MAPPER == 0 then
+            return mem.PATTERNTABLE_0[addr]
+        else
+            print(mem["CHR_BANK_" .. CPU_MEM.mapper.CHR_BANK_0])
+            return mem["CHR_BANK_" .. CPU_MEM.mapper.CHR_BANK_0][addr]
+        end
     elseif addr < 0x2000 then
-        return mem.PATTERNTABLE_1[addr - 0x1000]
+        if MAPPER == 0 then
+            return mem.PATTERNTABLE_1[addr - 0x1000]
+        else
+            return mem["CHR_BANK_" .. CPU_MEM.mapper.CHR_BANK_1][addr - 0x1000]
+        end
     elseif addr < 0x2400 then
         return mem.NAMETABLE_0[addr - 0x2000]
     elseif addr < 0x2800 then
@@ -233,7 +353,9 @@ function memory.read_ppu(mem, addr, val)
         return mem.NAMETABLE_2[addr - 0x3400]
     elseif addr < 0x3000 then
         return mem.NAMETABLE_3[addr - 0x3800]
-    elseif addr < 0x3F20 then
+    elseif addr < 0x4000 then
+        addr = addr % 0x20 + 0x3F00
+
         if addr == 0x3F04 or addr == 0x3F08 or addr == 0x3F0C then
             return mem.PALETTE[addr - 0x3F00]
         end
@@ -261,10 +383,8 @@ function memory.read_ppu(mem, addr, val)
         else
             return mem.PALETTE.SPP3[addr - 0x3F1D]
         end
-    elseif addr < 0x4000 then
-        return mem.OAM[addr - 0x3F00]
     else
-        print("Memory read error (PPU): " .. addr)
+        print("Memory read error (PPU): " .. util.hex4:format(addr))
         return 0
     end
 end
@@ -274,9 +394,18 @@ function memory.write_ppu(mem, addr, val)
     --           util.hex2:format(val))
 
     if addr < 0x1000 then
-        mem.PATTERNTABLE_0[addr] = val
+        if MAPPER == 0 then
+            mem.PATTERNTABLE_0[addr] = val
+        else
+            print(mem["CHR_BANK_" .. CPU_MEM.mapper.CHR_BANK_0])
+            mem["CHR_BANK_" .. CPU_MEM.mapper.CHR_BANK_0][addr] = val
+        end
     elseif addr < 0x2000 then
-        mem.PATTERNTABLE_1[addr - 0x1000] = val
+        if MAPPER == 0 then
+            mem.PATTERNTABLE_1[addr - 0x1000] = val
+        else
+            mem["CHR_BANK_" .. CPU_MEM.mapper.CHR_BANK_1][addr - 0x1000] = val
+        end
     elseif addr < 0x2400 then
         mem.NAMETABLE_0[addr - 0x2000] = val
     elseif addr < 0x2800 then
@@ -285,7 +414,12 @@ function memory.write_ppu(mem, addr, val)
         mem.NAMETABLE_2[addr - 0x3400] = val
     elseif addr < 0x3000 then
         mem.NAMETABLE_3[addr - 0x3800] = val
-    elseif addr < 0x3F20 then
+    elseif addr < 0x4000 then
+        print("Writing " .. util.hex2:format(val) .. " to PALETTE addr: " ..
+                  util.hex4:format(addr))
+
+        addr = addr % 0x20 + 0x3F00
+
         if addr == 0x3F04 or addr == 0x3F08 or addr == 0x3F0C then
             mem.PALETTE[addr - 0x3F00] = val
             return
@@ -317,10 +451,8 @@ function memory.write_ppu(mem, addr, val)
         else
             mem.PALETTE.SPP3[addr - 0x3F1D] = val
         end
-    elseif addr < 0x4000 then
-        mem.OAM[addr - 0x3F00] = val
     else
-        print("Memory write error (PPU): " .. addr)
+        print("Memory write error (PPU): " .. util.hex4:format(addr))
     end
 end
 

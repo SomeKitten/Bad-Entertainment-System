@@ -2031,6 +2031,9 @@ instructions[0x39] = function(mem, regs)
 
     regs.P = util.set_bit(regs.P, util.get_bit(regs.A, 7), 7)
     regs.P = util.set_bit(regs.P, z, 1)
+
+    -- *
+    return 4
 end
 
 instructions[0x59] = function(mem, regs)
@@ -2904,8 +2907,11 @@ end
 instructions[0x14] =
     function(mem, regs) regs.PC = instructions.inc16(regs.PC) end
 
-instructions[0x34] =
-    function(mem, regs) regs.PC = instructions.inc16(regs.PC) end
+instructions[0x34] = function(mem, regs)
+    regs.PC = instructions.inc16(regs.PC)
+
+    return 2
+end
 
 instructions[0x54] =
     function(mem, regs) regs.PC = instructions.inc16(regs.PC) end
@@ -2938,8 +2944,11 @@ instructions[0x89] =
 instructions[0xC2] =
     function(mem, regs) regs.PC = instructions.inc16(regs.PC) end
 
-instructions[0xE2] =
-    function(mem, regs) regs.PC = instructions.inc16(regs.PC) end
+instructions[0xE2] = function(mem, regs)
+    regs.PC = instructions.inc16(regs.PC)
+
+    return 2
+end
 
 instructions[0x1C] = function(mem, regs)
     regs.PC = instructions.inc16(regs.PC)

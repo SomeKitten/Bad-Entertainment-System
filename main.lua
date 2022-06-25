@@ -1,5 +1,5 @@
 ROMS_DIR = "/home/kitten/プロジェクト/Roms/NES/"
-ROM = "donkeykong.nes"
+ROM = "supermariobros.nes"
 
 local util = require("./util")
 local memory = require("./memory")
@@ -31,15 +31,61 @@ function love.load()
     local f = io.open("debug.log", "w")
     f:close()
 
-    util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"), CPU_MEM.CART, 0x0010,
-                       0x8000 - 0x4020, 0x4000)
-    util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"), CPU_MEM.CART, 0x0010,
-                       0xC000 - 0x4020, 0x4000)
+    iNES_HEADER = {}
+    util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"), iNES_HEADER, 0, 0, 0x10)
 
-    util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"), PPU_MEM.PATTERNTABLE_0,
-                       0x0010 + 0x4000, 0, 0x1000)
-    util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"), PPU_MEM.PATTERNTABLE_1,
-                       0x0010 + 0x5000, 0, 0x1000)
+    FULL_ROM = {}
+    util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"), FULL_ROM, 0x10, 0, 0)
+
+    MAPPER = bit.rshift(iNES_HEADER[6], 4) + bit.rshift(iNES_HEADER[7], 4) *
+                 0x10
+
+    PRG_BANKS = iNES_HEADER[4] -- 0x4000
+    CHR_BANKS = iNES_HEADER[5] -- 0x2000
+
+    print("MAPPER: " .. MAPPER)
+
+    if MAPPER == 0 then
+        if PRG_BANKS == 1 then
+            util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"), CPU_MEM.CART,
+                               0x0010, 0x8000 - 0x4020, 0x4000)
+            util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"), CPU_MEM.CART,
+                               0x0010, 0xC000 - 0x4020, 0x4000)
+
+            util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"),
+                               PPU_MEM.PATTERNTABLE_0, 0x0010 + 0x4000, 0,
+                               0x1000)
+            util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"),
+                               PPU_MEM.PATTERNTABLE_1, 0x0010 + 0x5000, 0,
+                               0x1000)
+        else
+            util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"), CPU_MEM.CART,
+                               0x0010, 0x8000 - 0x4020, 0x8000)
+
+            util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"),
+                               PPU_MEM.PATTERNTABLE_0, 0x0010 + 0x8000, 0,
+                               0x1000)
+            util.file_to_bytes(io.open(ROMS_DIR .. ROM, "r"),
+                               PPU_MEM.PATTERNTABLE_1, 0x0010 + 0x9000, 0,
+                               0x1000)
+        end
+    elseif MAPPER == 1 then
+        if CHR_BANKS == 0 then
+            PPU_MEM.CHR_BANK_0 = {}
+            for j = 0, 0x0FFF do PPU_MEM.CHR_BANK_0[j] = 0 end
+        else
+            for i = 0, CHR_BANKS - 1 do
+                PPU_MEM["CHR_BANK_" .. i] = {}
+                for j = 0, 0x0FFF do
+                    PPU_MEM["CHR_BANK_" .. i][j] = 0
+                end
+            end
+        end
+    else
+        print("Unknown mapper: " .. MAPPER)
+        QUIT = true
+        love.event.quit(0)
+    end
 
     local palette = {}
     util.file_to_bytes(io.open("./NES Classic Edition.pal", "r"), palette, 0, 0,
@@ -56,16 +102,16 @@ function love.load()
                        memory.read_cpu(CPU_MEM, 0xFFFC)
 
     -- DEBUG
-    REGISTERS.A = 0x00
-    REGISTERS.X = 0x17
-    REGISTERS.Y = 0x00
-    REGISTERS.P = 0x06
-    REGISTERS.SP = 0xFA
-    CPU_MEM.PPU_STATUS = 0x10
+    -- REGISTERS.A = 0x00
+    -- REGISTERS.X = 0x17
+    -- REGISTERS.Y = 0x00
+    -- REGISTERS.P = 0x06
+    -- REGISTERS.SP = 0xFA
+    -- CPU_MEM.PPU_STATUS = 0x10
+
+    print("RESET VEC:" .. util.hex4:format(REGISTERS.PC))
 
     NMI_OCCURRED = 0
-
-    -- print("RESET VEC:" .. util.hex4:format(REGISTERS.PC))
 
     RENDER = true
     QUIT = false
@@ -130,6 +176,15 @@ function love.draw()
     if RENDER then
         local canv = love.graphics.newCanvas(256, 240)
         love.graphics.setCanvas(canv)
+
+        -- print("PPU_MEM.PALETTE.UBGP: " .. PPU_MEM.PALETTE.UBGP)
+        -- print("COLOUR_PALETTE[PPU_MEM.PALETTE.UBGP]: " ..
+        --           tostring(COLOUR_PALETTE[PPU_MEM.PALETTE.UBGP]))
+
+        love.graphics.setColor(COLOUR_PALETTE[PPU_MEM.PALETTE.UBGP][1] / 255,
+                               COLOUR_PALETTE[PPU_MEM.PALETTE.UBGP][2] / 255,
+                               COLOUR_PALETTE[PPU_MEM.PALETTE.UBGP][3] / 255)
+        love.graphics.rectangle("fill", 0, 0, 256, 240)
 
         local colours = {}
         for i = 0x00, 0x3F do colours[i] = {} end
